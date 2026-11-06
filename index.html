@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>유튜브 링크 직결 섀도잉 분석기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+    .pulse-rec { animation: pulse-red 1.4s infinite; }
+    @keyframes pulse-red {
+      0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.65); }
+      70% { box-shadow: 0 0 0 14px rgba(220, 38, 38, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-100 flex justify-center min-h-screen text-slate-900 p-0 sm:p-4">
+
+  <div class="w-full max-w-[460px] bg-slate-50 min-h-screen sm:rounded-[32px] shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+
+    <!-- 로컬 파일(file://) 실행 시 오류 153 경고 배너 -->
+    <div id="file-protocol-warning" class="hidden bg-rose-600 text-white px-4 py-2.5 text-xs font-bold leading-relaxed">
+      ⚠️ 현재 로컬 파일(file://)로 열려 있어 유튜브 '오류 153'이 발생합니다. 터미널에서 <code>python -m http.server 8000</code> 실행 후 <code>http://localhost:8000</code>으로 접속하거나 Netlify에 배포해 열어주세요.
+    </div>
+
+    <!-- 1. 상단 유튜브 링크 입력 바 -->
+    <header class="bg-white p-3.5 border-b border-slate-200 space-y-2.5 shrink-0">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-black text-slate-900 flex items-center gap-1.5">
+          <i class="fa-brands fa-youtube text-red-600 text-base"></i>
+          유튜브 / 쇼츠 링크 섀도잉
+        </span>
+        <button id="btn-manual-script" class="text-[11px] font-bold text-orange-600 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-lg transition">
+          + 새 영상 자막 붙여넣기
+        </button>
+      </div>
+
+      <!-- 내장 영상 원클릭 프리셋 칩 -->
+      <div class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+        <button onclick="loadPreset('OoRdWDCsS5E')" class="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-[11px] font-bold shrink-0">노예한민국 (바비 리)</button>
+        <button onclick="loadPreset('WoLWd6j_sHw')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold shrink-0">돈 자랑 비교 (지미 오 양)</button>
+        <button onclick="loadPreset('XqmcKmoWRDg')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold shrink-0">매니큐어 논쟁 (Bad Friends)</button>
+        <button onclick="loadPreset('HzCgnrVm1O8')" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold shrink-0">맥도날드 (Dry Bar)</button>
+      </div>
+
+      <div class="flex gap-1.5">
+        <input
+          id="yt-url-input"
+          type="text"
+          placeholder="유튜브 또는 쇼츠 링크 붙여넣기 (https://...)"
+          value="https://www.youtube.com/shorts/OoRdWDCsS5E"
+          class="flex-1 px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500 font-medium"
+        />
+        <button id="btn-load-url" class="px-3.5 py-2 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white rounded-xl font-extrabold text-xs shrink-0 transition shadow-sm">
+          불러오기
+        </button>
+      </div>
+      <div id="load-status" class="text-[11px] text-emerald-600 font-bold">
+        ✓ '노예한민국 (OoRdWDCsS5E)' 7개 실제 대사 구간 로드 완료!
+      </div>
+    </header>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="flex-1 overflow-y-auto px-3.5 py-3 space-y-3">
+
+      <!-- 2. 실제 유튜브 영상 플레이어 & 구간 제어 -->
+      <section class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-slate-800" id="segment-counter">구간 1 / 7</span>
+          <span class="text-[11px] font-bold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-md" id="segment-time-badge">
+            0.0초 ~ 6.2초 (6.2초)
+          </span>
+        </div>
+
+        <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-inner">
+          <div id="yt-player"></div>
+        </div>
+
+        <!-- 구간 시간 미세 조정 (-0.5s / +0.5s) -->
+        <div class="flex items-center justify-between text-[11px] bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200">
+          <div class="flex items-center gap-1">
+            <span class="font-bold text-slate-500">시작:</span>
+            <button onclick="adjustTime('start', -0.5)" class="px-1.5 py-0.5 bg-white border rounded font-bold hover:bg-slate-100">-0.5s</button>
+            <button onclick="adjustTime('start', 0.5)" class="px-1.5 py-0.5 bg-white border rounded font-bold hover:bg-slate-100">+0.5s</button>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="font-bold text-slate-500">끝:</span>
+            <button onclick="adjustTime('end', -0.5)" class="px-1.5 py-0.5 bg-white border rounded font-bold hover:bg-slate-100">-0.5s</button>
+            <button onclick="adjustTime('end', 0.5)" class="px-1.5 py-0.5 bg-white border rounded font-bold hover:bg-slate-100">+0.5s</button>
+          </div>
+        </div>
+
+        <!-- 실제 영상 음성 재생 컨트롤러 -->
+        <div class="grid grid-cols-3 gap-2">
+          <button id="btn-play-seg" class="py-2.5 bg-orange-600 hover:bg-orange-700 active:scale-95 text-white rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition">
+            <i class="fa-solid fa-play text-[10px]"></i>
+            <span>실제 음성 (1.0x)</span>
+          </button>
+          <button id="btn-play-slow" class="py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition">
+            <i class="fa-solid fa-gauge-simple-low text-orange-600"></i>
+            <span>0.75x 느리게</span>
+          </button>
+          <button id="btn-toggle-loop" class="py-2.5 bg-orange-50 border border-orange-200 text-orange-700 active:scale-95 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition">
+            <i class="fa-solid fa-repeat"></i>
+            <span id="loop-label">구간반복 ON</span>
+          </button>
+        </div>
+
+        <div id="segment-chips" class="flex gap-1.5 overflow-x-auto no-scrollbar pt-1"></div>
+      </section>
+
+      <!-- 3. 현재 구간 대사 & 강세 가이드 & 녹음 제어 -->
+      <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold text-slate-900">현재 구간 영어 대사 & 목표 강세</span>
+          <span class="text-[10px] font-bold text-slate-400">굵은 주황색 = 강세(내용어)</span>
+        </div>
+
+        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+          <p id="target-sentence-html" class="text-[15px] font-bold text-slate-800 leading-relaxed"></p>
+          <p id="target-ko-text" class="text-xs font-medium text-slate-500"></p>
+          <p id="stress-guide-text" class="text-[11px] font-semibold text-orange-700 bg-orange-50 px-2.5 py-1.5 rounded-lg"></p>
+        </div>
+
+        <!-- 실시간 목소리 억양(Pitch) & 강세(Volume) 파형 모니터 -->
+        <div id="live-monitor-box" class="hidden bg-slate-900 rounded-xl p-3 space-y-2 text-white">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-bold text-red-400 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+              음성 파형 · 피치(Hz) 실시간 수집 중
+            </span>
+            <span id="rec-timer" class="font-mono font-bold text-amber-400">0.0s</span>
+          </div>
+          <canvas id="pitch-canvas" width="380" height="70" class="w-full h-[70px] bg-slate-950 rounded-lg border border-slate-800"></canvas>
+          <p id="live-stt-preview" class="text-xs text-slate-300 font-medium truncate">영어로 문장을 말씀해 주세요...</p>
+        </div>
+
+        <!-- 수동 녹음 시작 / 녹음 끝 버튼 -->
+        <div class="space-y-1.5">
+          <button id="btn-record-toggle" class="w-full py-4 bg-orange-600 hover:bg-orange-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition">
+            <i class="fa-solid fa-microphone text-base" id="rec-btn-icon"></i>
+            <span id="rec-btn-label">섀도잉 녹음 시작</span>
+          </button>
+          <p class="text-[11px] text-center text-slate-400 font-medium">
+            녹음 시작 후 대사를 끝까지 말하고 직접 [녹음 끝 · 분석하기]를 눌러주세요.
+          </p>
+        </div>
+      </section>
+
+      <!-- 4. 억양 · 톤 · 빠르기 · 강세 4대 지표 정밀 분석 카드 -->
+      <section id="result-card" class="hidden bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <span class="text-xs font-black text-slate-900">원본 대비 내 발음 종합 싱크로율</span>
+            <p class="text-[11px] text-slate-400">실제 음성 파형 및 단어 인식 대조 결과</p>
+          </div>
+          <span class="text-3xl font-black text-orange-600" id="overall-score">0점</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button id="btn-listen-mine" class="py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+            <i class="fa-solid fa-headphones"></i>
+            <span>내 녹음 다시 듣기</span>
+          </button>
+          <button id="btn-listen-compare" class="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+            <i class="fa-solid fa-arrows-left-right"></i>
+            <span>원본 ➔ 내 녹음 연속 비교</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+            <div class="flex justify-between items-center text-xs font-extrabold">
+              <span class="text-slate-600">📈 억양 (Intonation)</span>
+              <span id="score-intonation" class="text-indigo-600">0점</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div id="bar-intonation" class="h-full bg-indigo-600" style="width:0%"></div>
+            </div>
+            <p id="desc-intonation" class="text-[10px] text-slate-500 leading-tight"></p>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+            <div class="flex justify-between items-center text-xs font-extrabold">
+              <span class="text-slate-600">🎵 톤 (Pitch 고저폭)</span>
+              <span id="score-tone" class="text-emerald-600">0점</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div id="bar-tone" class="h-full bg-emerald-600" style="width:0%"></div>
+            </div>
+            <p id="desc-tone" class="text-[10px] text-slate-500 leading-tight"></p>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+            <div class="flex justify-between items-center text-xs font-extrabold">
+              <span class="text-slate-600">⚡ 빠르기 (Speed)</span>
+              <span id="score-speed" class="text-amber-600">0점</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div id="bar-speed" class="h-full bg-amber-500" style="width:0%"></div>
+            </div>
+            <p id="desc-speed" class="text-[10px] text-slate-500 leading-tight"></p>
+          </div>
+
+          <div class="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+            <div class="flex justify-between items-center text-xs font-extrabold">
+              <span class="text-slate-600">💥 강세 (Stress 리듬)</span>
+              <span id="score-stress" class="text-rose-600">0점</span>
+            </div>
+            <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div id="bar-stress" class="h-full bg-rose-600" style="width:0%"></div>
+            </div>
+            <p id="desc-stress" class="text-[10px] text-slate-500 leading-tight"></p>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-[11px] font-bold text-slate-600">
+            <span>단어별 발음 정확도 대조</span>
+            <span id="word-acc-badge" class="text-blue-600">정확도 0%</span>
+          </div>
+          <div id="word-diff-box" class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs leading-relaxed font-semibold"></div>
+          <p id="recognized-raw-text" class="text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1.5 rounded-lg"></p>
+        </div>
+
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 space-y-2">
+          <div class="text-xs font-black text-amber-900 flex items-center gap-1.5">
+            <i class="fa-solid fa-wrench text-amber-600"></i>
+            어디를 어떻게 고쳐야 할까요? (맞춤 교정 처방)
+          </div>
+          <ul id="actionable-fixes" class="text-xs text-slate-700 space-y-1.5 list-disc pl-4 leading-relaxed"></ul>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 하단 이전/다음 구간 이동 바 -->
+    <footer class="p-3.5 bg-white border-t border-slate-200 shrink-0 grid grid-cols-3 gap-2">
+      <button id="btn-prev-seg" class="col-span-1 py-3.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-2xl font-bold text-xs flex items-center justify-center gap-1">
+        <i class="fa-solid fa-chevron-left text-[10px]"></i>
+        <span>이전 구간</span>
+      </button>
+      <button id="btn-next-seg" class="col-span-2 py-3.5 bg-slate-900 hover:bg-black active:scale-95 text-white rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-md">
+        <span>다음 구간으로 이동</span>
+        <i class="fa-solid fa-chevron-right text-xs"></i>
+      </footer>
+  </div>
+
+  <!-- 수동 자막 붙여넣기 모달 -->
+  <div id="script-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-[420px] rounded-2xl p-5 space-y-3 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="font-black text-sm text-slate-900">유튜브 스크립트 붙여넣기 / 시간 자동 분할</h3>
+        <button id="btn-close-script-modal" class="text-slate-400 hover:text-slate-700 font-bold text-sm">✕</button>
+      </div>
+      <p class="text-[11px] text-slate-500 leading-relaxed">
+        새 유튜브 영상의 <b>[더보기 ➔ 스크립트 표시]</b> 내용을 복사해 붙여넣으면 시간과 문장이 즉시 나뉩니다.
+      </p>
+      <textarea id="raw-script-input" rows="7" class="w-full p-3 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-orange-500" placeholder="0:00
+Koreans didn't have slaves!
+0:06
+Korea had the longest unbroken chain of slavery"></textarea>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="btn-parse-script" class="py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-extrabold text-xs">
+          스크립트 적용하기
+        </button>
+        <button id="btn-auto-slice" class="py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold text-xs">
+          자막 없이 5초 단위로 쪼개기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    // 로컬 파일(file://)로 열었을 때 경고 표시
+    if (window.location.protocol === 'file:') {
+      document.getElementById('file-protocol-warning').classList.remove('hidden');
+    }
+
+    const FUNCTION_WORDS = new Set([
+      'a','an','the','in','on','at','to','for','of','with','by','from','as','into','like','through','after','over','between','out','against','during','without','before','under','around','among',
+      'i','you','he','she','it','we','they','me','him','her','us','them','my','your','his','its','our','their',
+      'am','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','shall','should','may','might','must','can','could',
+      'and','but','or','nor','so','yet','because','cuz','although','though','while','if','unless','until','when','where','that','which','who','whom','whose',
+      'this','these','those','there','here','just','up','about','some','any'
+    ]);
+
+    // 내장된 실제 쇼츠 자막 데이터베이스 (0.01초 즉시 로드)
+    const BUILTIN_DB = {
+      "OoRdWDCsS5E": [
+        { start: 0.0, end: 6.2, en: "Koreans didn't have slaves! Did Koreans have slaves? Yeah, Google that, cuz I think that's fucking wrong!", ko: "한국인들은 노예가 없었어! 한국에 노예가 있었다고? 야, 구글에 쳐봐, 내 생각엔 그거 완전 헛소리거든!" },
+        { start: 6.2, end: 15.0, en: "Korea, longest unbroken chain of slavery of any society in history, spanning 1500 years.", ko: "한국, 역사상 그 어떤 사회보다도 가장 오랫동안 끊기지 않고 이어진 노예제, 무려 1500년 동안 지속됨." },
+        { start: 15.0, end: 19.5, en: "Fuck off, that's not what it says! Zoom it in, my eyes are blurry!", ko: "웃기지 마, 거기에 그렇게 안 적혀 있어! 확대해 봐, 내 눈이 침침하단 말이야!" },
+        { start: 19.5, end: 24.5, en: "Go, I want to read it right, read it out loud, you piece of shit! Get close!", ko: "내가 똑바로 읽고 싶으니까 소리 내서 크게 읽어봐 이 자식아! 가까이 가져와 봐!" },
+        { start: 24.5, end: 34.0, en: "All right. Korea had the longest unbroken chain of slavery of any society in history.", ko: "좋아... 한국은 역사상 그 어떤 사회보다도 가장 긴 중단 없는 노예제 사슬을 유지했다." },
+        { start: 34.0, end: 43.5, en: "Fuck bro, holy shit! You guys are fucking scumbags! We're scumbags?! Dude, that's insane, that's super insane!", ko: "미쳤다 형! 너네 조상들 완전 쓰레기들이었네! 우리가 쓰레기라고?! 야 진짜 미쳤다!" },
+        { start: 43.5, end: 47.0, en: "Wait... who did we enslave?!", ko: "잠깐만... 근데 우리가 도대체 누굴 노예로 삼았던 건데?!" }
+      ],
+      "WoLWd6j_sHw": [
+        { start: 0.0, end: 6.0, en: "White people never brag about how much money they got, they always just brag about how expensive their life is.", ko: "백인들은 돈이 얼마나 많은지 자랑 안 해요. 대신 자기네 삶이 얼마나 비싼지를 자랑하죠." },
+        { start: 6.0, end: 14.8, en: "Like oh, Joey just started private school, it's so expensive, and our remodel is totally going over budget.", ko: "어머, 조이가 사립학교에 들어갔는데 너무 비싸요, 우리 집 리모델링은 완전히 예산을 초과했어요." },
+        { start: 14.8, end: 20.5, en: "Black people on the other hand, a lot more straightforward. Black people just tell you exactly how much money they spent on something.", ko: "반면에 흑인들은 훨씬 직설적이에요. 무언가에 정확히 얼마를 썼는지 그대로 말해주거든요." },
+        { start: 20.5, end: 29.5, en: "This car? Eighty thousand. My mama's house? Five hundred thousand. This chain? A million dollars, man.", ko: "이 차? 8만 불. 우리 엄마 집? 50만 불. 이 목걸이? 백만 불이야 임마." },
+        { start: 29.5, end: 36.8, en: "I'm like, okay, you clearly don't have your priorities straight. Asian people on the other hand, we do the exact opposite.", ko: "전 속으로 '우선순위가 완전히 잘못됐구만' 하죠. 반면 아시안들은 정반대입니다." },
+        { start: 36.8, end: 43.8, en: "We love to brag about how little money we spent on something. You never pay full price!", ko: "우린 무언가에 돈을 얼마나 적게 썼는지를 자랑하는 걸 좋아해요. 절대 제값 다 주고 안 사죠!" },
+        { start: 43.8, end: 58.0, en: "Like my mom, her catchphrase is, Guess how much? I'm like, Mom, five thousand dollars? And she was like, No, it's two hundred!", ko: "우리 엄마 유행어가 '얼마게?'예요. 제가 '5천 불?' 하면 엄마는 '아니아니, 200불이야!' 하시죠." }
+      ],
+      "XqmcKmoWRDg": [
+        { start: 0.0, end: 5.2, en: "You have painted nails? Yeah, and you saw that Sunday and you complimented it!", ko: "손톱에 매니큐어 칠했어? 응, 형도 일요일에 그거 봤고 칭찬까지 했잖아!" },
+        { start: 5.2, end: 11.2, en: "No, go fuck yourself! Look at the YouTube, go back to my YouTube and go down.", ko: "아니거든, 웃기지 마! 유튜브 봐봐, 내 유튜브 채널 들어가서 밑으로 내려봐." },
+        { start: 11.2, end: 16.5, en: "Look, I want to show you that I'm not kidding around about that. That's horrible!", ko: "내가 이거 가지고 장난치는 게 아니라는 걸 보여주려고 그래. 그건 끔찍하다고!" },
+        { start: 16.5, end: 21.8, en: "Painted nails! I kicked somebody out of my podcast for that, but he was a little more feminine than you.", ko: "매니큐어 칠한 손톱 말이야! 난 그거 때문에 내 팟캐스트에서 사람도 쫓아냈어." },
+        { start: 28.5, end: 36.2, en: "You see? Yeah, I got him out. Why? Because he painted his nails!", ko: "보이지? 그래, 내가 걔 내보냈어. 왜냐고? 손톱에 매니큐어를 칠했으니까!" },
+        { start: 36.2, end: 47.5, en: "No, I just realized in the middle of the podcast he painted his nails, I told him to leave!", ko: "아니, 그냥 팟캐스트 녹화 도중에 손톱 칠한 걸 알아차리고 나가라고 했어!" }
+      ],
+      "HzCgnrVm1O8": [
+        { start: 0.0, end: 5.8, en: "You guys, I've never done the walk of shame before, never.", ko: "여러분, 전 살면서 그 민망한 귀갓길을 해본 적이 한 번도 없어요." },
+        { start: 5.8, end: 13.0, en: "The most shameful walk I do as a person is when I take a bag of McDonald's trash out of the passenger side floor seat of my car", ko: "인간으로서 제가 하는 가장 수치스러운 걸음은 제 차 조수석 바닥에서 맥도날드 쓰레기 봉투를 꺼내 들고" },
+        { start: 13.0, end: 21.0, en: "to walk and to throw away at a second McDonald's location, usually in the same day.", ko: "걸어가서 두 번째 방문한 다른 맥도날드 매장에 버릴 때예요. 보통 같은 날에 말이죠." },
+        { start: 24.0, end: 31.8, en: "Cuz it's trashy to admit it, but I love McDonald's you guys. I love chemically altered non-nutritional food that costs a dollar, right?", ko: "인정하기 좀 없어 보여서 그렇지, 전 맥도날드를 사랑해요. 1달러짜리 무영양 식품을 사랑한다고요." },
+        { start: 39.2, end: 48.5, en: "Cuz we all know that McDonald's is just a public restroom that also sells hamburgers.", ko: "우리 모두 맥도날드는 사실 햄버거도 겸사겸사 파는 공중화장실이라는 걸 다 알잖아요." }
+      ]
+    };
+
+    let currentVideoId = "OoRdWDCsS5E";
+    let segments = [...BUILTIN_DB["OoRdWDCsS5E"]];
+    let curIdx = 0;
+    let isLooping = true;
+    let ytPlayer = null;
+    let isPlayerReady = false;
+    let loopTimer = null;
+
+    // 녹음 & Web Audio DSP 상태
+    let isRecording = false;
+    let audioCtx = null;
+    let analyser = null;
+    let micStream = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let recordedBlobUrl = null;
+    let recognition = null;
+    let sttTranscript = "";
+    let recStartTime = 0;
+    let recTimerInterval = null;
+    let animFrameId = null;
+    let pitchSamples = [];
+    let rmsSamples = [];
+
+    function onYouTubeIframeAPIReady() {
+      const playerVars = { playsinline: 1, rel: 0, modestbranding: 1, controls: 1 };
+      if (window.location.protocol.startsWith('http')) {
+        playerVars.origin = window.location.origin;
+      }
+      ytPlayer = new YT.Player('yt-player', {
+        width: '100%',
+        height: '100%',
+        videoId: currentVideoId,
+        playerVars,
+        events: {
+          onReady: () => {
+            isPlayerReady = true;
+            startTimeWatcher();
+            renderSegmentUI();
+          }
+        }
+      });
+    }
+
+    function startTimeWatcher() {
+      if (loopTimer) clearInterval(loopTimer);
+      loopTimer = setInterval(() => {
+        if (!isPlayerReady || !ytPlayer || typeof ytPlayer.getPlayerState !== 'function') return;
+        if (ytPlayer.getPlayerState() === YT.PlayerState.PLAYING) {
+          const now = ytPlayer.getCurrentTime();
+          const seg = segments[curIdx];
+          if (seg && now >= seg.end) {
+            if (isLooping) ytPlayer.seekTo(seg.start, true);
+            else ytPlayer.pauseVideo();
+          }
+        }
+      }, 50);
+    }
+
+    function playCurrentSegment(rate = 1.0) {
+      const seg = segments[curIdx];
+      if (!seg || !isPlayerReady || !ytPlayer) return;
+      ytPlayer.setPlaybackRate(rate);
+      ytPlayer.seekTo(seg.start, true);
+      ytPlayer.playVideo();
+    }
+
+    window.loadPreset = function(vid) {
+      document.getElementById('yt-url-input').value = `https://www.youtube.com/shorts/${vid}`;
+      loadVideoByIdAndSegments(vid);
+    };
+
+    function extractVideoId(url) {
+      const clean = url.trim();
+      const patterns = [
+        /youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+        /youtu\.be\/([a-zA-Z0-9_-]{11})/,
+        /[?&]v=([a-zA-Z0-9_-]{11})/,
+        /youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/
+      ];
+      for (const p of patterns) {
+        const m = clean.match(p);
+        if (m && m[1]) return m[1];
+      }
+      if (/^[a-zA-Z0-9_-]{11}$/.test(clean)) return clean;
+      return null;
+    }
+
+    function loadVideoByIdAndSegments(vid) {
+      const statusEl = document.getElementById('load-status');
+      currentVideoId = vid;
+
+      if (isPlayerReady && ytPlayer && typeof ytPlayer.cueVideoById === 'function') {
+        ytPlayer.cueVideoById(vid);
+      }
+
+      if (BUILTIN_DB[vid]) {
+        segments = JSON.parse(JSON.stringify(BUILTIN_DB[vid]));
+        curIdx = 0;
+        renderSegmentUI();
+        statusEl.className = "text-[11px] text-emerald-600 font-bold";
+        statusEl.innerText = `✓ (${vid}) 실제 대사 ${segments.length}개 구간 즉시 로드 완료!`;
+      } else {
+        autoSliceByDuration(5.0);
+        statusEl.className = "text-[11px] text-amber-600 font-bold";
+        statusEl.innerText = `✓ 새 영상(${vid})을 5초 구간으로 분할했습니다. 우측 상단 [+ 새 영상 자막 붙여넣기]로 대사를 넣을 수 있습니다.`;
+      }
+    }
+
+    document.getElementById('btn-load-url').addEventListener('click', () => {
+      const rawUrl = document.getElementById('yt-url-input').value;
+      const vid = extractVideoId(rawUrl);
+      if (!vid) {
+        const statusEl = document.getElementById('load-status');
+        statusEl.className = "text-[11px] text-rose-600 font-bold";
+        statusEl.innerText = "올바른 유튜브 또는 쇼츠 링크를 입력해 주세요.";
+        return;
+      }
+      loadVideoByIdAndSegments(vid);
+    });
+
+    window.adjustTime = function(type, delta) {
+      const seg = segments[curIdx];
+      if (!seg) return;
+      if (type === 'start') {
+        seg.start = Math.max(0, Number((seg.start + delta).toFixed(1)));
+        if (seg.start >= seg.end - 0.5) seg.end = Number((seg.start + 1.5).toFixed(1));
+      } else {
+        seg.end = Math.max(seg.start + 0.8, Number((seg.end + delta).toFixed(1)));
+      }
+      renderSegmentUI();
+      playCurrentSegment(1.0);
+    };
+
+    function autoSliceByDuration(secStep = 5.0) {
+      const list = [];
+      for (let t = 0; t < 50; t += secStep) {
+        const s = Number(t.toFixed(1));
+        const e = Number((t + secStep).toFixed(1));
+        list.push({
+          start: s,
+          end: e,
+          en: `Segment #${list.length + 1} (${s}s ~ ${e}s) - Listen to the original clip and shadow the speaker.`,
+          ko: `우측 상단 [+ 새 영상 자막 붙여넣기]를 눌러 영어 대사를 넣거나 바로 음성 파형 섀도잉을 진행하세요.`
+        });
+      }
+      segments = list;
+      curIdx = 0;
+      renderSegmentUI();
+    }
+
+    function getContentWords(sentence) {
+      const words = sentence.replace(/[^a-zA-Z0-9'\s-]/g, '').split(/\s+/).filter(Boolean);
+      return words.filter(w => {
+        const lower = w.toLowerCase();
+        if (lower.endsWith("n't") || lower === "not" || lower === "never") return true;
+        return !FUNCTION_WORDS.has(lower) && lower.length > 1;
+      });
+    }
+
+    function renderSegmentUI() {
+      const seg = segments[curIdx];
+      if (!seg) return;
+
+      const dur = (seg.end - seg.start).toFixed(1);
+      document.getElementById('segment-counter').innerText = `구간 ${curIdx + 1} / ${segments.length}`;
+      document.getElementById('segment-time-badge').innerText = `${seg.start.toFixed(1)}초 ~ ${seg.end.toFixed(1)}초 (${dur}초)`;
+
+      const words = seg.en.split(/\s+/);
+      const htmlWords = words.map(rawW => {
+        const clean = rawW.toLowerCase().replace(/[^a-z0-9']/g, '');
+        const isNeg = clean.endsWith("n't") || clean === "not" || clean === "never";
+        const isContent = isNeg || (!FUNCTION_WORDS.has(clean) && clean.length > 2);
+        if (isContent) {
+          return `<span class="text-orange-600 font-black underline decoration-orange-300 underline-offset-4">${rawW}</span>`;
+        }
+        return `<span class="text-slate-600 font-semibold">${rawW}</span>`;
+      });
+      document.getElementById('target-sentence-html').innerHTML = htmlWords.join(' ');
+      document.getElementById('target-ko-text').innerText = seg.ko || "";
+
+      const contentList = getContentWords(seg.en);
+      const isQuestion = seg.en.trim().endsWith('?');
+      const intonationRule = isQuestion
+        ? "의문문 억양: 문장 끝 음높이(Pitch)를 끌어올리세요 (↗)"
+        : "평서문/감탄문 억양: 주황색 강세 단어에서 피치를 높이고 문장 끝은 내리세요 (↘)";
+
+      document.getElementById('stress-guide-text').innerText =
+        `강세 핵심어(${contentList.length}개): [${contentList.slice(0, 6).join(', ')}] · ${intonationRule}`;
+
+      const chipBox = document.getElementById('segment-chips');
+      chipBox.innerHTML = segments.map((s, idx) => {
+        const active = idx === curIdx
+          ? "bg-slate-900 text-white font-extrabold"
+          : "bg-slate-100 text-slate-600 font-bold hover:bg-slate-200";
+        return `<button onclick="jumpToSegment(${idx})" class="px-2.5 py-1 rounded-lg text-[11px] shrink-0 transition ${active}">
+          #${idx + 1} (${s.start.toFixed(0)}s)
+        </button>`;
+      }).join('');
+
+      document.getElementById('result-card').classList.add('hidden');
+    }
+
+    window.jumpToSegment = function(idx) {
+      curIdx = idx;
+      renderSegmentUI();
+      playCurrentSegment(1.0);
+    };
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    document.getElementById('btn-record-toggle').addEventListener('click', () => {
+      if (!isRecording) startRecordingSession();
+      else stopRecordingAndEvaluate();
+    });
+
+    async function startRecordingSession() {
+      if (isPlayerReady && ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+        ytPlayer.pauseVideo();
+      }
+
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
+        });
+      } catch (err) {
+        alert("마이크 권한이 필요합니다. (http://localhost 또는 https:// 주소에서 실행해 주세요)");
+        return;
+      }
+
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(micStream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunks, { type: 'audio/webm' });
+        if (recordedBlobUrl) URL.revokeObjectURL(recordedBlobUrl);
+        recordedBlobUrl = URL.createObjectURL(blob);
+      };
+      mediaRecorder.start();
+
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(micStream);
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+
+      pitchSamples = [];
+      rmsSamples = [];
+      sttTranscript = "";
+      recStartTime = performance.now();
+
+      if (SpeechRecognition) {
+        try {
+          recognition = new SpeechRecognition();
+          recognition.lang = 'en-US';
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.onresult = (event) => {
+            let text = "";
+            for (let i = 0; i < event.results.length; i++) {
+              text += event.results[i][0].transcript + " ";
+            }
+            sttTranscript = text.trim();
+            document.getElementById('live-stt-preview').innerText = sttTranscript || "듣고 있습니다...";
+          };
+          recognition.start();
+        } catch (e) {}
+      }
+
+      isRecording = true;
+      document.getElementById('live-monitor-box').classList.remove('hidden');
+      document.getElementById('result-card').classList.add('hidden');
+      document.getElementById('live-stt-preview').innerText = "영어로 문장을 말씀해 주세요...";
+
+      const btn = document.getElementById('btn-record-toggle');
+      btn.className = "w-full py-4 bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md pulse-rec transition";
+      document.getElementById('rec-btn-icon').className = "fa-solid fa-stop text-base";
+      document.getElementById('rec-btn-label').innerText = "녹음 끝 · 분석하기 (클릭 시 채점)";
+
+      recTimerInterval = setInterval(() => {
+        const sec = ((performance.now() - recStartTime) / 1000).toFixed(1);
+        document.getElementById('rec-timer').innerText = `${sec}s`;
+      }, 100);
+
+      captureAcousticFrame();
+    }
+
+    function captureAcousticFrame() {
+      if (!isRecording || !analyser) return;
+      const bufLen = analyser.fftSize;
+      const buf = new Float32Array(bufLen);
+      analyser.getFloatTimeDomainData(buf);
+
+      const timeOffset = (performance.now() - recStartTime) / 1000;
+      let sumSq = 0;
+      for (let i = 0; i < bufLen; i++) sumSq += buf[i] * buf[i];
+      const rms = Math.sqrt(sumSq / bufLen);
+      rmsSamples.push({ t: timeOffset, rms });
+
+      if (rms > 0.015) {
+        const hz = autoCorrelatePitch(buf, audioCtx.sampleRate);
+        if (hz >= 75 && hz <= 420) pitchSamples.push({ t: timeOffset, hz });
+      }
+
+      drawLivePitchCanvas();
+      animFrameId = requestAnimationFrame(captureAcousticFrame);
+    }
+
+    function autoCorrelatePitch(buf, sampleRate) {
+      const size = buf.length;
+      let r1 = 0, r2 = size - 1, thres = 0.2;
+      for (let i = 0; i < size / 2; i++) { if (Math.abs(buf[i]) < thres) { r1 = i; break; } }
+      for (let i = 1; i < size / 2; i++) { if (Math.abs(buf[size - i]) < thres) { r2 = size - i; break; } }
+      const sliced = buf.slice(r1, r2);
+      const newSize = sliced.length;
+      const c = new Float32Array(newSize);
+      for (let i = 0; i < newSize; i++) {
+        for (let j = 0; j < newSize - i; j++) c[i] = c[i] + sliced[j] * sliced[j + i];
+      }
+      let d = 0;
+      while (d < newSize - 1 && c[d] > c[d + 1]) d++;
+      let maxval = -1, maxpos = -1;
+      for (let i = d; i < newSize; i++) {
+        if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+      }
+      if (maxpos <= 0) return -1;
+      return sampleRate / maxpos;
+    }
+
+    function drawLivePitchCanvas() {
+      const canvas = document.getElementById('pitch-canvas');
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const recentRms = rmsSamples.slice(-80);
+      const barW = canvas.width / 80;
+      ctx.fillStyle = 'rgba(249, 115, 22, 0.35)';
+      recentRms.forEach((item, idx) => {
+        const h = Math.min(canvas.height, item.rms * 320);
+        ctx.fillRect(idx * barW, canvas.height - h, barW - 1, h);
+      });
+
+      const recentPitch = pitchSamples.slice(-60);
+      if (recentPitch.length > 1) {
+        ctx.beginPath();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.5;
+        recentPitch.forEach((p, idx) => {
+          const x = (idx / 60) * canvas.width;
+          const y = canvas.height - Math.min(canvas.height - 6, Math.max(6, ((p.hz - 80) / 260) * canvas.height));
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+    }
+
+    function stopRecordingAndEvaluate() {
+      isRecording = false;
+      if (recTimerInterval) clearInterval(recTimerInterval);
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+
+      const totalRecSec = Math.max(0.8, (performance.now() - recStartTime) / 1000);
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') { try { mediaRecorder.stop(); } catch (e) {} }
+      if (recognition) { try { recognition.stop(); } catch (e) {} }
+      if (micStream) micStream.getTracks().forEach(t => t.stop());
+      if (audioCtx) { try { audioCtx.close(); } catch (e) {} }
+
+      document.getElementById('live-monitor-box').classList.add('hidden');
+      const btn = document.getElementById('btn-record-toggle');
+      btn.className = "w-full py-4 bg-orange-600 hover:bg-orange-700 active:scale-[0.99] text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition";
+      document.getElementById('rec-btn-icon').className = "fa-solid fa-rotate-right text-base";
+      document.getElementById('rec-btn-label').innerText = "다시 섀도잉 녹음하기";
+
+      setTimeout(() => runMultiDimensionalScoring(totalRecSec), 300);
+    }
+
+    function runMultiDimensionalScoring(totalRecSec) {
+      const seg = segments[curIdx];
+      const nativeDur = Math.max(1.0, seg.end - seg.start);
+
+      const activeFrames = rmsSamples.filter(s => s.rms > 0.018);
+      let activeSpeechSec = totalRecSec;
+      if (activeFrames.length >= 2) {
+        activeSpeechSec = Math.max(0.8, activeFrames[activeFrames.length - 1].t - activeFrames[0].t + 0.25);
+      }
+
+      const targetWords = cleanWordArray(seg.en);
+      const spokenWords = cleanWordArray(sttTranscript);
+      const contentTargets = getContentWords(seg.en);
+
+      // 1. 억양 (Intonation)
+      let intonationScore = 35, intonationDesc = "피치 감지 부족", intonationFix = "";
+      if (pitchSamples.length >= 5) {
+        const third = Math.max(1, Math.floor(pitchSamples.length / 3));
+        const startAvg = avgHz(pitchSamples.slice(0, third));
+        const midAvg = avgHz(pitchSamples.slice(third, third * 2));
+        const endAvg = avgHz(pitchSamples.slice(-third));
+        const isQuestion = seg.en.trim().endsWith('?');
+
+        if (isQuestion) {
+          const rise = endAvg - midAvg;
+          if (rise >= 12) {
+            intonationScore = Math.min(98, 85 + Math.round(rise / 3));
+            intonationDesc = `끝음 상승(+${Math.round(rise)}Hz) 우수`;
+          } else {
+            intonationScore = Math.max(45, 70 + Math.round(rise));
+            intonationDesc = `끝음 상승 부족 (${Math.round(rise)}Hz)`;
+            intonationFix = `의문문이지만 문장 끝 억양이 내려갔습니다. 마지막 단어("${targetWords[targetWords.length - 1]}")의 끝음을 확실히 들어 올려 주세요.`;
+          }
+        } else {
+          const peakDrop = Math.max(startAvg, midAvg) - endAvg;
+          if (peakDrop >= 10) {
+            intonationScore = Math.min(98, 84 + Math.round(peakDrop / 3));
+            intonationDesc = `핵심어 상승 후 하강(-${Math.round(peakDrop)}Hz) 안정적`;
+          } else {
+            intonationScore = 62;
+            intonationDesc = `억양 낙차 작음 (${Math.round(Math.abs(peakDrop))}Hz)`;
+            intonationFix = `주황색 핵심 단어에서 음높이를 높였다가 문장 끝 단어("${targetWords[targetWords.length - 1]}")에서 톤을 뚝 떨어뜨려 주세요.`;
+          }
+        }
+      }
+
+      // 2. 톤 (Pitch Dynamic Range)
+      let toneScore = 35, toneDesc = "성대 울림 부족", toneFix = "";
+      if (pitchSamples.length >= 5) {
+        const meanF0 = avgHz(pitchSamples);
+        const variance = pitchSamples.reduce((acc, p) => acc + Math.pow(p.hz - meanF0, 2), 0) / pitchSamples.length;
+        const stdDevHz = Math.sqrt(variance);
+        if (stdDevHz >= 20 && stdDevHz <= 65) {
+          toneScore = Math.min(98, Math.round(80 + (stdDevHz - 20) * 0.5));
+          toneDesc = `평균 ${Math.round(meanF0)}Hz · 고저폭 ±${Math.round(stdDevHz)}Hz`;
+        } else if (stdDevHz < 20) {
+          toneScore = Math.max(40, Math.round((stdDevHz / 20) * 75));
+          toneDesc = `고저폭 ±${Math.round(stdDevHz)}Hz (단조로운 모노톤)`;
+          toneFix = `음높이 변화폭이 ±${Math.round(stdDevHz)}Hz로 평탄합니다. 원어민처럼 감정을 실어 고저차(±25Hz 이상)를 크게 벌려 보세요.`;
+        } else {
+          toneScore = 80;
+          toneDesc = `평균 ${Math.round(meanF0)}Hz · 고저폭 ±${Math.round(stdDevHz)}Hz`;
+        }
+      }
+
+      // 3. 빠르기 (Speed)
+      const nativeWpm = Math.round((targetWords.length / nativeDur) * 60);
+      const userWordCount = spokenWords.length > 0 ? spokenWords.length : targetWords.length;
+      const userWpm = Math.round((userWordCount / activeSpeechSec) * 60);
+      const durDiff = activeSpeechSec - nativeDur;
+      const durRatio = Math.min(activeSpeechSec, nativeDur) / Math.max(activeSpeechSec, nativeDur);
+      const speedScore = Math.min(99, Math.max(35, Math.round(durRatio * 100)));
+      const speedDesc = `내 발화 ${activeSpeechSec.toFixed(1)}초 (${userWpm} WPM) / 원본 ${nativeDur.toFixed(1)}초`;
+      let speedFix = "";
+      if (durDiff > 1.0) {
+        speedFix = `원본보다 ${durDiff.toFixed(1)}초 느립니다. 전치사·대명사 같은 기능어를 앞 단어에 연음으로 빠르게 붙여 읽으세요.`;
+      } else if (durDiff < -1.0) {
+        speedFix = `원본보다 ${Math.abs(durDiff).toFixed(1)}초 너무 빨리 끝났습니다. 주황색 강세 단어의 모음을 충분히 길게 발음하세요.`;
+      }
+
+      // 4. 강세 (Stress)
+      const rmsValues = rmsSamples.map(s => s.rms);
+      const maxRms = Math.max(...rmsValues, 0.01);
+      const meanRms = rmsValues.reduce((a, b) => a + b, 0) / (rmsValues.length || 1);
+      let stressPeaks = 0, inPeak = false;
+      const peakThreshold = Math.max(0.03, meanRms * 1.35);
+      for (const s of rmsSamples) {
+        if (s.rms >= peakThreshold && !inPeak) { stressPeaks++; inPeak = true; }
+        else if (s.rms < peakThreshold * 0.8) inPeak = false;
+      }
+      const expectedPeaks = Math.max(1, contentTargets.length);
+      const peakRatio = Math.min(stressPeaks, expectedPeaks) / Math.max(stressPeaks, expectedPeaks, 1);
+      const dynamicRatio = meanRms > 0 ? Math.min(1, (maxRms - meanRms) / (meanRms * 1.8)) : 0;
+      const stressScore = activeFrames.length < 3 ? 30 : Math.min(98, Math.max(40, Math.round((peakRatio * 0.6 + dynamicRatio * 0.4) * 100)));
+      const stressDesc = `강세 타격 ${stressPeaks}회 감지 (목표 ${expectedPeaks}개)`;
+      let stressFix = stressScore < 75 ? `[${contentTargets.slice(0, 4).join(', ')}] 단어에서 성량을 확실히 키워 강약 대비를 주세요.` : "";
+
+      // 단어 일치도
+      let matchedWords = 0, missedWords = [];
+      const diffHtml = targetWords.map(tw => {
+        const hit = spokenWords.some(sw => isWordMatch(sw, tw));
+        if (hit) {
+          matchedWords++;
+          return `<span class="inline-block bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md m-0.5">${tw}</span>`;
+        } else {
+          missedWords.push(tw);
+          return `<span class="inline-block bg-rose-100 text-rose-700 line-through px-2 py-0.5 rounded-md m-0.5">${tw}</span>`;
+        }
+      }).join(' ');
+
+      const wordAccPct = targetWords.length > 0 ? Math.round((matchedWords / targetWords.length) * 100) : 0;
+      const overall = spokenWords.length > 0
+        ? Math.round(wordAccPct * 0.35 + intonationScore * 0.2 + toneScore * 0.15 + speedScore * 0.15 + stressScore * 0.15)
+        : Math.round(intonationScore * 0.25 + toneScore * 0.25 + speedScore * 0.25 + stressScore * 0.25);
+
+      document.getElementById('result-card').classList.remove('hidden');
+      document.getElementById('overall-score').innerText = `${overall}점`;
+      setMetricUI('intonation', intonationScore, intonationDesc);
+      setMetricUI('tone', toneScore, toneDesc);
+      setMetricUI('speed', speedScore, speedDesc);
+      setMetricUI('stress', stressScore, stressDesc);
+
+      document.getElementById('word-acc-badge').innerText = spokenWords.length > 0 ? `단어 정확도 ${wordAccPct}%` : `음성 파형 기준 분석`;
+      document.getElementById('word-diff-box').innerHTML = diffHtml;
+      document.getElementById('recognized-raw-text').innerText = spokenWords.length > 0
+        ? `인식된 내 영어 문장: "${sttTranscript}"`
+        : `음성 파형 분석 완료 ([원본 ➔ 내 녹음 연속 비교] 버튼으로 들어보세요)`;
+
+      const fixes = [];
+      if (missedWords.length > 0 && spokenWords.length > 0) {
+        fixes.push(`<b>발음 교정 필요 단어:</b> <span class="text-rose-600 font-bold">[${missedWords.slice(0, 5).join(', ')}]</span> 발음이 누락되었거나 부정확하게 인식되었습니다.`);
+      }
+      if (intonationFix) fixes.push(`<b>억양(Intonation):</b> ${intonationFix}`);
+      if (toneFix) fixes.push(`<b>톤(Pitch 고저차):</b> ${toneFix}`);
+      if (speedFix) fixes.push(`<b>빠르기(Speed):</b> ${speedFix}`);
+      if (stressFix) fixes.push(`<b>강세(Stress):</b> ${stressFix}`);
+      if (fixes.length === 0) fixes.push(`<b>완벽한 싱크로율!</b> 원본의 속도, 강세, 억양 곡선과 매우 유사합니다.`);
+
+      document.getElementById('actionable-fixes').innerHTML = fixes.map(f => `<li>${f}</li>`).join('');
+    }
+
+    function setMetricUI(key, score, desc) {
+      document.getElementById(`score-${key}`).innerText = `${score}점`;
+      document.getElementById(`bar-${key}`).style.width = `${score}%`;
+      document.getElementById(`desc-${key}`).innerText = desc;
+    }
+
+    function avgHz(arr) { return arr.length ? arr.reduce((s, x) => s + x.hz, 0) / arr.length : 0; }
+    function cleanWordArray(str) { return (str || '').toLowerCase().replace(/[^a-z0-9'\s]/g, '').trim().split(/\s+/).filter(Boolean); }
+    function isWordMatch(a, b) {
+      const ca = a.replace(/'/g, ''), cb = b.replace(/'/g, '');
+      return ca === cb || (ca.length > 3 && cb.length > 3 && (ca.includes(cb) || cb.includes(ca)));
+    }
+
+    document.getElementById('btn-listen-mine').addEventListener('click', () => {
+      if (!recordedBlobUrl) return alert("먼저 녹음을 진행해 주세요.");
+      new Audio(recordedBlobUrl).play();
+    });
+
+    document.getElementById('btn-listen-compare').addEventListener('click', () => {
+      if (!recordedBlobUrl) return alert("먼저 녹음을 진행해 주세요.");
+      const seg = segments[curIdx];
+      const durMs = (seg.end - seg.start) * 1000;
+      const prevLoop = isLooping;
+      isLooping = false;
+      playCurrentSegment(1.0);
+      setTimeout(() => {
+        if (isPlayerReady && ytPlayer) ytPlayer.pauseVideo();
+        isLooping = prevLoop;
+        new Audio(recordedBlobUrl).play();
+      }, durMs + 250);
+    });
+
+    document.getElementById('btn-play-seg').addEventListener('click', () => playCurrentSegment(1.0));
+    document.getElementById('btn-play-slow').addEventListener('click', () => playCurrentSegment(0.75));
+    document.getElementById('btn-toggle-loop').addEventListener('click', () => {
+      isLooping = !isLooping;
+      document.getElementById('loop-label').innerText = isLooping ? "구간반복 ON" : "1회 재생";
+    });
+    document.getElementById('btn-prev-seg').addEventListener('click', () => {
+      curIdx = (curIdx - 1 + segments.length) % segments.length;
+      renderSegmentUI();
+      playCurrentSegment(1.0);
+    });
+    document.getElementById('btn-next-seg').addEventListener('click', () => {
+      curIdx = (curIdx + 1) % segments.length;
+      renderSegmentUI();
+      playCurrentSegment(1.0);
+    });
+
+    document.getElementById('btn-manual-script').addEventListener('click', () => {
+      document.getElementById('script-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-script-modal').addEventListener('click', () => {
+      document.getElementById('script-modal').classList.add('hidden');
+    });
+    document.getElementById('btn-auto-slice').addEventListener('click', () => {
+      autoSliceByDuration(5.0);
+      document.getElementById('script-modal').classList.add('hidden');
+    });
+    document.getElementById('btn-parse-script').addEventListener('click', () => {
+      const raw = document.getElementById('raw-script-input').value.trim();
+      if (!raw) return;
+      const lines = raw.split(/\n+/).map(l => l.trim()).filter(Boolean);
+      const parsed = [];
+      let currentStart = null, textBuf = [];
+      const timeRegex = /^(?:(\d+):)?(\d{1,2}):(\d{2})$/;
+      for (const line of lines) {
+        const m = line.match(timeRegex);
+        if (m) {
+          if (currentStart !== null && textBuf.length > 0) {
+            parsed.push({ start: currentStart, text: textBuf.join(' ') });
+            textBuf = [];
+          }
+          currentStart = (m[1] ? parseInt(m[1], 10) : 0) * 3600 + parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+        } else {
+          textBuf.push(line);
+        }
+      }
+      if (currentStart !== null && textBuf.length > 0) parsed.push({ start: currentStart, text: textBuf.join(' ') });
+      if (parsed.length > 0) {
+        segments = parsed.map((item, i) => ({
+          start: Number(item.start.toFixed(1)),
+          end: Number(Math.max(item.start + 2.5, parsed[i + 1] ? parsed[i + 1].start : item.start + 5.0).toFixed(1)),
+          en: item.text
+        }));
+      } else {
+        segments = lines.map((line, i) => ({ start: i * 5.0, end: (i + 1) * 5.0, en: line }));
+      }
+      curIdx = 0;
+      renderSegmentUI();
+      document.getElementById('script-modal').classList.add('hidden');
+    });
+
+    window.addEventListener('DOMContentLoaded', () => renderSegmentUI());
+  </script>
+</body>
+</html>
