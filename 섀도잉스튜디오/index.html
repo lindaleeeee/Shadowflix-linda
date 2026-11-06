@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#f4f1ec">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>섀도잉 스튜디오</title>
+<style>
+:root{--bg:#f4f1ec;--card:#fff;--ink:#1b1a17;--sub:#6b665d;--line:#e6e0d6;--chip:#efeae2;
+  --accent:#e2561b;--accent-soft:#fdeee6;--me:#2f6fdb;--me-soft:#e6eefc;
+  --ok:#17855b;--ok-soft:#e3f4ec;--warn:#b7791f;--warn-soft:#fbf1dc;--bad:#c53a3a;--bad-soft:#fbe7e7}
+@media (prefers-color-scheme:dark){:root{--bg:#141311;--card:#1e1c19;--ink:#f1ede6;--sub:#a59f94;--line:#2f2c27;--chip:#2a2723;
+  --accent:#ff7a3d;--accent-soft:#3a2418;--me:#6fa0ff;--me-soft:#1a2740;
+  --ok:#3fc58f;--ok-soft:#14301f;--warn:#e2b04a;--warn-soft:#352a12;--bad:#ff7070;--bad-soft:#3a1a1a}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR",system-ui,sans-serif;font-size:15px;line-height:1.5}
+button,input{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+.wrap{max-width:560px;margin:0 auto;padding:max(10px,env(safe-area-inset-top)) 14px calc(28px + env(safe-area-inset-bottom))}
+.hide{display:none!important}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-top:12px}
+.brand{font-weight:900;font-size:20px;letter-spacing:-.03em;padding:6px 2px}
+.brand b{color:var(--accent)}
+.sub{color:var(--sub);font-size:13px}
+.input{width:100%;padding:13px 14px;border:1px solid var(--line);border-radius:14px;background:var(--bg);font-size:15px}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;flex:1;padding:12px 8px;border-radius:14px;border:1px solid var(--line);background:var(--card);font-weight:700;font-size:14px}
+.btn:active{transform:scale(.97)}
+.btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.row{display:flex;gap:8px;margin-top:10px}
+.vlist .item{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.vlist .item:last-child{border-bottom:0}
+.vlist img,.thumb-ph{width:64px;height:48px;border-radius:10px;object-fit:cover;background:var(--chip);flex:none;display:grid;place-items:center;font-size:20px}
+.vlist .t{flex:1;min-width:0}
+.vlist .t b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.del{font-size:12px;color:var(--sub);padding:6px}
+.qr{display:flex;gap:14px;align-items:center}
+.qr svg{width:132px;height:132px;flex:none;background:#fff;border-radius:10px}
+.spin{width:36px;height:36px;border:3px solid var(--chip);border-top-color:var(--accent);border-radius:50%;margin:8px auto;animation:sp .9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.pbar{height:6px;background:var(--chip);border-radius:6px;overflow:hidden;margin-top:12px}
+.pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.center{text-align:center}
+/* practice */
+.top{display:flex;align-items:center;gap:8px;padding:4px 0}
+.back{width:38px;height:38px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:18px;flex:none}
+.top .tt{flex:1;min-width:0}
+.top .tt b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 3px 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;min-width:34px;height:34px;padding:0 6px;border-radius:10px;background:var(--chip);font-weight:800;font-size:13px}
+.chips button.cur{outline:2px solid var(--accent);outline-offset:1px}
+.chips .g{background:var(--ok-soft);color:var(--ok)}.chips .m{background:var(--warn-soft);color:var(--warn)}.chips .l{background:var(--bad-soft);color:var(--bad)}
+.cnt{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);font-weight:700}
+.sent{font-size:21px;font-weight:800;line-height:1.42;margin:8px 0 2px;letter-spacing:-.01em;word-break:keep-all}
+.links{display:flex;gap:14px;font-size:12px;font-weight:700}
+.links a{color:var(--sub);text-decoration:none}
+.rec-btn{width:100%;margin-top:12px;padding:17px;border-radius:16px;background:var(--accent);color:#fff;font-weight:900;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px}
+.rec-btn.rec{background:var(--bad);animation:pl 1.4s infinite}
+.rec-btn.busy{background:var(--ink);color:var(--bg)}
+@keyframes pl{0%{box-shadow:0 0 0 0 rgba(197,58,58,.5)}70%{box-shadow:0 0 0 14px rgba(197,58,58,0)}100%{box-shadow:0 0 0 0 rgba(197,58,58,0)}}
+.meter{height:6px;background:var(--chip);border-radius:6px;overflow:hidden;margin-top:8px;visibility:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--bad);transition:width .08s}
+.hint{font-size:12px;color:var(--sub);text-align:center;margin-top:6px;min-height:18px}
+/* result */
+.res-head{display:flex;align-items:center;gap:14px}
+.ring{width:84px;height:84px;flex:none;position:relative}
+.ring svg{width:84px;height:84px;transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:900}
+.bars{flex:1;display:grid;gap:5px}
+.bar-row{display:grid;grid-template-columns:48px 1fr 30px;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.bar-row .tr{height:7px;background:var(--chip);border-radius:7px;overflow:hidden}
+.bar-row .tr i{display:block;height:100%;border-radius:7px}
+.bar-row span:last-child{text-align:right}
+.sec{font-size:12px;font-weight:800;color:var(--sub);margin:16px 0 6px;display:flex;justify-content:space-between;align-items:center}
+.legend{display:flex;gap:10px;font-weight:700}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:4px}
+.chart{width:100%;display:block;background:var(--bg);border-radius:12px}
+.words{line-height:2.3}
+.words span{display:inline-block;position:relative;padding:0 6px;border-radius:7px;margin:0 2px 3px 0;font-weight:700;font-size:15px}
+.words .ok{background:var(--ok-soft);color:var(--ok)}
+.words .close{background:var(--warn-soft);color:var(--warn)}
+.words .miss{background:var(--bad-soft);color:var(--bad);text-decoration:line-through}
+.words .rs::before{content:"";position:absolute;left:50%;top:-5px;width:7px;height:7px;margin-left:-8px;border-radius:50%;background:var(--accent)}
+.words .ms::after{content:"";position:absolute;left:50%;top:-5px;width:7px;height:7px;margin-left:1px;border-radius:50%;background:var(--me)}
+.fixes{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.fixes li{display:flex;gap:8px;font-size:14px;line-height:1.45}
+.fixes .tag{flex:none;font-size:11px;font-weight:800;padding:2px 7px;border-radius:7px;height:fit-content;margin-top:1px;background:var(--chip);color:var(--sub)}
+.fixes .tag.억양{background:var(--accent-soft);color:var(--accent)}
+.fixes .tag.강세{background:var(--me-soft);color:var(--me)}
+.fixes .tag.빠르기{background:var(--warn-soft);color:var(--warn)}
+.fixes .tag.발음{background:var(--bad-soft);color:var(--bad)}
+.fixes .tag.좋아요{background:var(--ok-soft);color:var(--ok)}
+.heard{font-size:12px;color:var(--sub);margin-top:10px}
+.nav{display:flex;gap:8px;margin-top:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 홈 -->
+  <div id="v-home">
+    <div class="brand">섀도잉<b>스튜디오</b></div>
+    <section class="card">
+      <div style="font-weight:800;margin-bottom:8px">유튜브 링크 붙여넣기</div>
+      <input class="input" id="url" inputmode="url" placeholder="https://youtube.com/shorts/..." autocomplete="off">
+      <div class="row">
+        <button class="btn primary" id="b-load">불러오기</button>
+        <label class="btn" style="flex:0 0 auto;padding:12px 14px">파일<input type="file" id="file" accept="audio/*,video/*" hidden></label>
+      </div>
+      <div class="sub" style="margin-top:8px">영상 소리를 받아 문장별로 잘라 줍니다. 쇼츠는 보통 30초~1분 걸립니다.</div>
+    </section>
+    <section class="card hide" id="qr-card">
+      <div class="qr"><div id="qr"></div>
+        <div><b>휴대폰으로 하기</b><div class="sub">휴대폰 카메라로 QR을 찍으면 바로 열립니다. 이 PC 프로그램이 켜져 있는 동안 어디서든 됩니다.</div></div></div>
+    </section>
+    <section class="card">
+      <div style="font-weight:800">내 영상</div>
+      <div class="vlist" id="vlist"><div class="sub" style="padding:10px 0">아직 불러온 영상이 없습니다.</div></div>
+    </section>
+  </div>
+
+  <!-- 불러오는 중 -->
+  <section class="card center hide" id="v-loading" style="margin-top:40px;padding:28px 18px">
+    <div class="spin"></div>
+    <div style="font-weight:800;font-size:17px;margin-top:6px" id="ld-title">불러오는 중</div>
+    <div class="sub" id="ld-msg"></div>
+    <div class="pbar"><i id="ld-bar"></i></div>
+    <button class="btn" style="margin-top:16px" id="b-cancel">홈으로</button>
+  </section>
+
+  <!-- 연습 -->
+  <div id="v-practice" class="hide">
+    <div class="top">
+      <button class="back" id="b-home" aria-label="홈">‹</button>
+      <div class="tt"><b id="p-title"></b><span class="sub" id="p-sub"></span></div>
+      <a id="p-yt" class="sub" target="_blank" rel="noopener" style="font-weight:700;text-decoration:none">영상 ↗</a>
+    </div>
+    <div class="chips" id="chips"></div>
+
+    <section class="card">
+      <div class="cnt"><span id="cnt"></span><span id="best"></span></div>
+      <div class="sent" id="sent"></div>
+      <div class="links"><a id="papago" target="_blank" rel="noopener">번역 ↗</a><span class="sub" id="seg-len"></span></div>
+
+      <div class="row">
+        <button class="btn" id="b-play">▶ 원본 듣기</button>
+        <button class="btn" id="b-slow">0.75x</button>
+        <button class="btn" id="b-loop">3회</button>
+      </div>
+
+      <button class="rec-btn" id="b-rec">🎙 섀도잉 시작</button>
+      <div class="meter" id="meter"><i></i></div>
+      <div class="hint" id="hint">원본을 듣고, 버튼을 누른 뒤 따라 말하세요.</div>
+    </section>
+
+    <section class="card hide" id="result">
+      <div class="res-head">
+        <div class="ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--chip)" stroke-width="3.2"/><circle id="ring-c" cx="18" cy="18" r="15.9" fill="none" stroke="var(--accent)" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="0 100"/></svg><b id="overall">0</b></div>
+        <div class="bars" id="bars"></div>
+      </div>
+
+      <div class="sec"><span>억양 그래프</span><span class="legend"><span><i style="background:var(--accent)"></i>원본</span><span><i style="background:var(--me)"></i>나</span></span></div>
+      <svg class="chart" id="chart" viewBox="0 0 340 170"></svg>
+
+      <div class="sec"><span>단어별 (<span style="color:var(--accent)">●</span> 원본 강세 · <span style="color:var(--me)">●</span> 내 강세)</span></div>
+      <div class="words" id="words"></div>
+      <div class="sub" id="speedline"></div>
+
+      <div class="sec"><span>이렇게 고쳐 보세요</span></div>
+      <ul class="fixes" id="fixes"></ul>
+      <div class="heard" id="heard"></div>
+
+      <div class="row">
+        <button class="btn" id="b-orig">▶ 원본</button>
+        <button class="btn" id="b-mine">▶ 내 녹음</button>
+        <button class="btn" id="b-ab">원본→나</button>
+      </div>
+    </section>
+
+    <div class="nav">
+      <button class="btn" id="b-prev">◀ 이전</button>
+      <button class="btn" id="b-next">다음 문장 ▶</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tt; function toast(m){ const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2800); }
+const LS = { get(k, d){ try{ const v = localStorage.getItem('ss_' + k); return v == null ? d : JSON.parse(v); }catch(_){ return d; } },
+             set(k, v){ try{ localStorage.setItem('ss_' + k, JSON.stringify(v)); }catch(_){} } };
+
+/* ── 접속 키 ── */
+const qk = new URLSearchParams(location.search).get('k');
+if (qk) LS.set('key', qk);
+const KEY = qk || LS.get('key', '');
+const withK = p => p + (p.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(KEY);
+async function api(p, opt){
+  const r = await fetch(withK(p), Object.assign({cache: 'no-store'}, opt));
+  let j = null; try{ j = await r.json(); }catch(_){}
+  if (!r.ok) throw new Error((j && j.error) || '서버 응답 오류 (' + r.status + ')');
+  return j;
+}
+
+/* ── 화면 전환 ── */
+function show(v){ ['home', 'loading', 'practice'].forEach(n => $('#v-' + n).classList.toggle('hide', n !== v)); window.scrollTo(0, 0); }
+
+/* ── 홈 ── */
+async function home(){
+  stopAll(); show('home'); history.replaceState(null, '', location.pathname);
+  try{
+    const r = await api('/api/videos');
+    const box = $('#vlist');
+    if (!r.videos.length){ box.innerHTML = '<div class="sub" style="padding:10px 0">아직 불러온 영상이 없습니다.</div>'; }
+    else box.innerHTML = r.videos.map(v => {
+      const best = LS.get('best_' + v.id, {}); const done = Object.keys(best).length;
+      const thumb = v.youtube ? `<img src="https://i.ytimg.com/vi/${esc(v.id)}/mqdefault.jpg" alt="">` : '<div class="thumb-ph">🎬</div>';
+      return `<div class="item" data-id="${esc(v.id)}">${thumb}<div class="t"><b>${esc(v.title)}</b><span class="sub">${v.n}문장 · 연습 ${done}/${v.n}</span></div><button class="del" data-del="${esc(v.id)}">삭제</button></div>`;
+    }).join('');
+  }catch(e){ $('#vlist').innerHTML = `<div class="sub" style="padding:10px 0">${esc(e.message)}</div>`; }
+  try{
+    const i = await api('/api/info');
+    const mobile = matchMedia('(pointer:coarse)').matches;
+    if (i.qr && !mobile){ $('#qr').innerHTML = i.qr; $('#qr-card').classList.remove('hide'); }
+    else if (!i.phone_url && !mobile){ setTimeout(async () => { try{ const j = await api('/api/info'); if (j.qr && !$('#v-home').classList.contains('hide')){ $('#qr').innerHTML = j.qr; $('#qr-card').classList.remove('hide'); } }catch(_){} }, 6000); }
+  }catch(_){}
+}
+$('#vlist').onclick = async e => {
+  const d = e.target.closest('[data-del]');
+  if (d){ e.stopPropagation(); if (!confirm('이 영상을 삭제할까요?')) return; await api('/api/delete?id=' + d.dataset.del).catch(() => {}); return home(); }
+  const it = e.target.closest('[data-id]'); if (it) openLesson(it.dataset.id);
+};
+$('#b-load').onclick = () => loadUrl($('#url').value.trim());
+$('#url').addEventListener('keydown', e => { if (e.key === 'Enter') loadUrl($('#url').value.trim()); });
+$('#file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  loading('파일 올리는 중', f.name, 0);
+  try{
+    const r = await api('/api/upload?name=' + encodeURIComponent(f.name), {method: 'POST', body: f});
+    r.state === 'done' ? openLesson(r.id) : poll(r.id);
+  }catch(err){ toast(err.message); home(); }
+};
+$('#b-cancel').onclick = () => { pollTok++; home(); };
+
+function loading(t, m, p){ show('loading'); $('#ld-title').textContent = t; $('#ld-msg').textContent = m || ''; $('#ld-bar').style.width = ((p || 0) * 100) + '%'; }
+async function loadUrl(u){
+  const m = u.match(/https?:\/\/\S+/); if (!m) return toast('영상 링크를 붙여넣어 주세요');
+  loading('영상 불러오는 중', '', 0);
+  try{ const r = await api('/api/load?url=' + encodeURIComponent(m[0])); r.state === 'done' ? openLesson(r.id) : poll(r.id); }
+  catch(e){ toast(e.message); home(); }
+}
+let pollTok = 0;
+async function poll(id){
+  const my = ++pollTok;
+  while (my === pollTok){
+    let r; try{ r = await api('/api/status?id=' + id); }catch(e){ toast(e.message); return home(); }
+    if (my !== pollTok) return;
+    if (r.state === 'done') return openLesson(id);
+    if (r.state === 'error'){ toast(r.msg || '실패했습니다'); return home(); }
+    loading('영상 준비 중', r.msg, r.p);
+    await new Promise(res => setTimeout(res, 1000));
+  }
+}
+
+/* ── 레슨 ── */
+let L = null, PCM = null, RATE = 16000, idx = 0, best = {};
+const segUrl = {}, mine = {};
+async function openLesson(id){
+  stopAll(); loading('문장 불러오는 중', '', .5);
+  try{
+    L = await api('/api/lesson?id=' + id);
+    const buf = await (await fetch(withK('/media/' + id + '.wav'))).arrayBuffer();
+    parseWav(buf);
+  }catch(e){ toast('불러오지 못했습니다: ' + e.message); return home(); }
+  for (const k in segUrl){ URL.revokeObjectURL(segUrl[k]); delete segUrl[k]; }
+  for (const k in mine){ delete mine[k]; }
+  best = LS.get('best_' + id, {});
+  idx = Math.min(LS.get('pos_' + id, 0), L.segments.length - 1);
+  $('#p-title').textContent = L.title;
+  $('#p-sub').textContent = `${L.segments.length}문장`;
+  $('#p-yt').href = L.youtube ? 'https://www.youtube.com/shorts/' + L.id : '#';
+  $('#p-yt').classList.toggle('hide', !L.youtube);
+  show('practice'); render();
+}
+function parseWav(buf){
+  const dv = new DataView(buf); let p = 12, ch = 1;
+  while (p + 8 <= dv.byteLength){
+    const id = String.fromCharCode(dv.getUint8(p), dv.getUint8(p+1), dv.getUint8(p+2), dv.getUint8(p+3)), sz = dv.getUint32(p + 4, true);
+    if (id === 'fmt '){ ch = dv.getUint16(p + 10, true); RATE = dv.getUint32(p + 12, true); }
+    if (id === 'data'){ PCM = new Int16Array(buf.slice(p + 8, p + 8 + Math.min(sz, dv.byteLength - p - 8))); return; }
+    p += 8 + sz + (sz & 1);
+  }
+  throw new Error('오디오 형식 오류');
+}
+function wavBlob(int16, rate){
+  const b = new ArrayBuffer(44 + int16.length * 2), v = new DataView(b), w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, 'RIFF'); v.setUint32(4, 36 + int16.length * 2, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, int16.length * 2, true);
+  new Int16Array(b, 44).set(int16); return new Blob([b], {type: 'audio/wav'});
+}
+function segAudio(i){
+  if (!segUrl[i]){ const s = L.segments[i]; segUrl[i] = URL.createObjectURL(wavBlob(PCM.subarray(Math.floor(s.s * RATE), Math.ceil(s.e * RATE)), RATE)); }
+  return segUrl[i];
+}
+
+function render(){
+  const s = L.segments[idx];
+  LS.set('pos_' + L.id, idx);
+  $('#cnt').textContent = `문장 ${idx + 1} / ${L.segments.length}`;
+  $('#best').textContent = best[idx] != null ? `최고 ${best[idx]}점` : '';
+  $('#sent').textContent = s.text;
+  $('#papago').href = 'https://papago.naver.com/?sk=en&tk=ko&st=' + encodeURIComponent(s.text);
+  $('#seg-len').textContent = `${(s.e - s.s).toFixed(1)}초`;
+  $('#result').classList.add('hide');
+  $('#hint').textContent = '원본을 듣고, 버튼을 누른 뒤 따라 말하세요.';
+  $('#b-prev').disabled = idx === 0;
+  $('#b-next').textContent = idx === L.segments.length - 1 ? '처음으로 ↺' : '다음 문장 ▶';
+  if (mine[idx] && mine[idx].res) showResult(mine[idx].res);
+  chips();
+}
+function chips(){
+  $('#chips').innerHTML = L.segments.map((_, i) => { const b = best[i];
+    const c = b == null ? '' : b >= 80 ? 'g' : b >= 60 ? 'm' : 'l';
+    return `<button class="${c}${i === idx ? ' cur' : ''}" data-i="${i}">${i + 1}</button>`; }).join('');
+  const c = $('#chips .cur'); if (c) c.scrollIntoView({block: 'nearest', inline: 'center'});
+}
+$('#chips').onclick = e => { const b = e.target.closest('[data-i]'); if (!b) return; stopAll(); idx = +b.dataset.i; render(); };
+$('#b-prev').onclick = () => { if (idx > 0){ stopAll(); idx--; render(); } };
+$('#b-next').onclick = () => { stopAll(); idx = (idx + 1) % L.segments.length; render(); };
+$('#b-home').onclick = home;
+
+/* ── 재생 (실제 영상 소리) ── */
+const au = new Audio(); au.preservesPitch = true; au.mozPreservesPitch = true; au.webkitPreservesPitch = true;
+let playTok = 0;
+function stopPlay(){ playTok++; au.pause(); ['#b-play', '#b-slow', '#b-loop', '#b-orig', '#b-mine', '#b-ab'].forEach(b => $(b).classList.remove('on')); }
+function playUrl(url, rate = 1, btn){
+  return new Promise(res => {
+    const my = playTok;
+    au.src = url; au.defaultPlaybackRate = rate; au.playbackRate = rate;
+    if (btn) $(btn).classList.add('on');
+    const done = () => { au.onended = au.onerror = null; if (btn) $(btn).classList.remove('on'); res(my === playTok); };
+    au.onended = done; au.onerror = done;
+    au.play().then(() => { au.playbackRate = rate; }).catch(() => { toast('재생할 수 없습니다'); done(); });
+  });
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+$('#b-play').onclick = () => { stopAll(); playUrl(segAudio(idx), 1, '#b-play'); };
+$('#b-slow').onclick = () => { stopAll(); playUrl(segAudio(idx), .75, '#b-slow'); };
+$('#b-loop').onclick = async () => { stopAll(); const my = playTok; $('#b-loop').classList.add('on');
+  for (let k = 0; k < 3 && my === playTok; k++){ if (!await playUrl(segAudio(idx), 1)) break; await wait(500); }
+  if (my === playTok) $('#b-loop').classList.remove('on'); };
+$('#b-orig').onclick = () => { stopAll(); playUrl(segAudio(idx), 1, '#b-orig'); };
+$('#b-mine').onclick = () => { stopAll(); if (mine[idx]) playUrl(mine[idx].url, 1, '#b-mine'); };
+$('#b-ab').onclick = async () => { stopAll(); if (!mine[idx]) return; $('#b-ab').classList.add('on');
+  if (await playUrl(segAudio(idx), 1)){ await wait(350); await playUrl(mine[idx].url, 1); } $('#b-ab').classList.remove('on'); };
+
+/* ── 녹음 ── */
+let ctx = null, stream = null, proc = null, srcNode = null, chunks = [], recording = false, recT0 = 0, recTimer = null, busy = false;
+async function startRec(){
+  stopPlay();
+  try{
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const resumeP = ctx.resume();
+    stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: false, noiseSuppression: false, autoGainControl: false}});
+    await resumeP;
+  }catch(e){
+    toast(location.protocol === 'https:' || location.hostname === 'localhost' ? '마이크 권한을 허용해 주세요' : '마이크는 https 주소에서만 됩니다. QR 주소로 접속하세요');
+    return;
+  }
+  srcNode = ctx.createMediaStreamSource(stream);
+  proc = ctx.createScriptProcessor(4096, 1, 1);
+  const g = ctx.createGain(); g.gain.value = 0;
+  srcNode.connect(proc); proc.connect(g); g.connect(ctx.destination);
+  chunks = []; recording = true; recT0 = Date.now();
+  proc.onaudioprocess = e => {
+    if (!recording) return;
+    const d = e.inputBuffer.getChannelData(0); chunks.push(new Float32Array(d));
+    let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] * d[i];
+    $('#meter i').style.width = Math.min(100, Math.sqrt(s / (d.length / 4)) * 400) + '%';
+  };
+  const b = $('#b-rec'); b.className = 'rec-btn rec'; b.textContent = '⏹ 녹음 끝';
+  $('#meter').style.visibility = 'visible';
+  recTimer = setInterval(() => { const t = (Date.now() - recT0) / 1000; $('#hint').textContent = `녹음 중 ${t.toFixed(1)}초 · 다 말했으면 '녹음 끝'을 누르세요`; if (t > 30) stopRec(); }, 100);
+}
+function releaseMic(){
+  recording = false; clearInterval(recTimer);
+  try{ proc && (proc.onaudioprocess = null, proc.disconnect()); srcNode && srcNode.disconnect(); }catch(_){}
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = proc = srcNode = null;
+  $('#meter').style.visibility = 'hidden'; $('#meter i').style.width = '0';
+}
+async function stopRec(){
+  if (!recording) return;
+  const rate = ctx.sampleRate, seg = idx;
+  releaseMic();
+  const n = chunks.reduce((a, c) => a + c.length, 0);
+  if (n < rate * 0.4){ resetRecBtn(); $('#hint').textContent = '너무 짧습니다. 다시 녹음해 주세요.'; return; }
+  const all = new Float32Array(n); let o = 0; for (const c of chunks){ all.set(c, o); o += c.length; }
+  chunks = [];
+  const pcm16k = await resample(all, rate, 16000);
+  const i16 = new Int16Array(pcm16k.length);
+  for (let i = 0; i < pcm16k.length; i++){ const v = Math.max(-1, Math.min(1, pcm16k[i])); i16[i] = v < 0 ? v * 32768 : v * 32767; }
+  const blob = wavBlob(i16, 16000);
+  if (mine[seg]) URL.revokeObjectURL(mine[seg].url);
+  mine[seg] = {url: URL.createObjectURL(blob), res: null};
+  busy = true; const b = $('#b-rec'); b.className = 'rec-btn busy'; b.textContent = '분석 중…';
+  $('#hint').textContent = '원본과 비교하는 중입니다 (몇 초 걸립니다)';
+  try{
+    const r = await api(`/api/analyze?id=${encodeURIComponent(L.id)}&seg=${seg}`, {method: 'POST', body: blob, headers: {'Content-Type': 'audio/wav'}});
+    if (seg !== idx) return;
+    if (!r.ok){ $('#hint').textContent = r.reason; toast(r.reason); return; }
+    mine[seg].res = r;
+    if (best[seg] == null || r.overall > best[seg]){ best[seg] = r.overall; LS.set('best_' + L.id, best); }
+    $('#best').textContent = `최고 ${best[seg]}점`;
+    showResult(r); chips();
+    $('#hint').textContent = '결과를 보고 다시 녹음해 보세요.';
+  }catch(e){ toast(e.message); $('#hint').textContent = '분석에 실패했습니다. 다시 시도해 주세요.'; }
+  finally{ busy = false; resetRecBtn(); }
+}
+function resetRecBtn(){ const b = $('#b-rec'); b.className = 'rec-btn'; b.textContent = mine[idx] ? '🎙 다시 녹음' : '🎙 섀도잉 시작'; }
+async function resample(x, from, to){
+  if (from === to) return x;
+  try{
+    const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const oc = new OC(1, Math.ceil(x.length * to / from), to);
+    const b = oc.createBuffer(1, x.length, from); b.getChannelData(0).set(x);
+    const s = oc.createBufferSource(); s.buffer = b; s.connect(oc.destination); s.start();
+    const out = await oc.startRendering(); return out.getChannelData(0);
+  }catch(_){
+    const r = from / to, n = Math.floor(x.length / r), y = new Float32Array(n);
+    for (let i = 0; i < n; i++){ const a = Math.floor(i * r), e = Math.min(x.length, Math.floor((i + 1) * r)); let s = 0; for (let k = a; k < e; k++) s += x[k]; y[i] = s / Math.max(1, e - a); }
+    return y;
+  }
+}
+$('#b-rec').onclick = () => { if (busy) return; if (recording) stopRec(); else startRec(); };
+function stopAll(){ stopPlay(); if (recording){ releaseMic(); resetRecBtn(); } }
+
+/* ── 결과 표시 ── */
+const NAMES = [['intonation', '억양'], ['tone', '톤'], ['speed', '빠르기'], ['stress', '강세'], ['accuracy', '발음']];
+const col = v => v == null ? 'var(--sub)' : v >= 80 ? 'var(--ok)' : v >= 60 ? 'var(--warn)' : 'var(--bad)';
+function showResult(r){
+  $('#result').classList.remove('hide');
+  $('#overall').textContent = r.overall;
+  $('#ring-c').setAttribute('stroke-dasharray', `${r.overall} 100`);
+  $('#ring-c').setAttribute('stroke', col(r.overall));
+  $('#bars').innerHTML = NAMES.map(([k, n]) => { const v = r.scores[k];
+    return `<div class="bar-row"><span>${n}</span><span class="tr"><i style="width:${v == null ? 0 : v}%;background:${col(v)}"></i></span><span style="color:${col(v)}">${v == null ? '–' : v}</span></div>`; }).join('');
+  drawChart(r.chart);
+  $('#words').innerHTML = r.words.map(w => `<span class="${w.st}${w.rs ? ' rs' : ''}${w.ms ? ' ms' : ''}">${esc(w.w)}</span>`).join('');
+  const sp = r.speed;
+  $('#speedline').textContent = sp ? `길이: 원본 ${sp.ref.toFixed(1)}초 · 나 ${sp.me.toFixed(1)}초 (${sp.ratio > 1.08 ? sp.ratio.toFixed(1) + '배 느림' : sp.ratio < 0.92 ? '더 빠름' : '비슷함'})` : '';
+  $('#fixes').innerHTML = r.feedback.map(f => `<li><span class="tag ${esc(f.cat)}">${esc(f.cat)}</span><span>${esc(f.text)}</span></li>`).join('');
+  $('#heard').textContent = r.heard ? `인식된 내 문장: "${r.heard}"` : '';
+}
+function drawChart(c){
+  const svg = $('#chart'), W = 340, H = 170, top = 10, bot = 130;
+  if (!c || !c.t.length){ svg.innerHTML = ''; return; }
+  const tmax = Math.max(c.t[c.t.length - 1], 0.3);
+  const vals = [...c.ref, ...c.me].filter(v => v != null);
+  let lo = Math.min(-4, ...vals), hi = Math.max(4, ...vals); lo = Math.max(lo, -12); hi = Math.min(hi, 12);
+  const X = t => 6 + (t / tmax) * (W - 12), Y = v => bot - ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * (bot - top);
+  const path = arr => { let d = '', pen = false;
+    arr.forEach((v, i) => { if (v == null){ pen = false; return; } d += (pen ? 'L' : 'M') + X(c.t[i]).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; }); return d; };
+  let g = `<line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)" stroke-dasharray="3 3"/>`;
+  c.words.forEach(([w, s, e], i) => {
+    const x = X(s), xm = X((s + e) / 2);
+    g += `<line x1="${x}" x2="${x}" y1="${top}" y2="${bot}" stroke="var(--line)"/>`;
+    g += `<text x="${xm}" y="${bot + 14 + (i % 2) * 13}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--sub)">${esc(w)}</text>`;
+  });
+  g += `<path d="${path(c.ref)}" fill="none" stroke="var(--accent)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  g += `<path d="${path(c.me)}" fill="none" stroke="var(--me)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+  g += `<text x="4" y="${top + 8}" font-size="9" fill="var(--sub)">높음</text><text x="4" y="${bot - 2}" font-size="9" fill="var(--sub)">낮음</text>`;
+  svg.innerHTML = g;
+}
+
+/* ── 시작 ── */
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopAll(); });
+if (!KEY){ show('home'); $('#vlist').innerHTML = '<div class="sub" style="padding:10px 0">PC에서 실행한 프로그램이 보여주는 주소(QR)로 접속해 주세요.</div>'; }
+else home();
+</script>
+</body>
+</html>
